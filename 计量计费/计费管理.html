@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>计费配置管理</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    Arial, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                color: #333;
+            }
+
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+
+            .header {
+                text-align: center;
+                margin-bottom: 30px;
+                color: white;
+            }
+
+            .header h1 {
+                font-size: 2.5rem;
+                margin-bottom: 10px;
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            }
+
+            .header p {
+                font-size: 1.1rem;
+                opacity: 0.9;
+            }
+
+            .config-panel {
+                background: white;
+                border-radius: 15px;
+                padding: 30px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+                margin-bottom: 30px;
+            }
+
+            .environment-selector {
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 2px solid #f0f0f0;
+            }
+
+            .env-tabs {
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+
+            .env-tab {
+                padding: 12px 24px;
+                background: #f8f9fa;
+                border: 2px solid #e1e5e9;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.3s;
+                font-weight: 500;
+            }
+
+            .env-tab:hover {
+                background: #e9ecef;
+                border-color: #667eea;
+            }
+
+            .env-tab.active {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border-color: #667eea;
+            }
+
+            .config-form {
+                display: none;
+            }
+
+            .config-form.active {
+                display: block;
+            }
+
+            .form-title {
+                color: #667eea;
+                font-size: 1.5rem;
+                margin-bottom: 20px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #f0f0f0;
+            }
+
+            .resource-config {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 20px;
+                margin-bottom: 30px;
+            }
+
+            .resource-item {
+                background: #f8f9fa;
+                border-radius: 12px;
+                padding: 20px;
+                border: 2px solid #e1e5e9;
+                transition: all 0.3s;
+            }
+
+            .resource-item:hover {
+                border-color: #667eea;
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            }
+
+            .resource-header {
+                display: flex;
+                align-items: center;
+                margin-bottom: 15px;
+            }
+
+            .resource-icon {
+                width: 40px;
+                height: 40px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-right: 12px;
+                font-size: 1.2rem;
+                color: white;
+            }
+
+            .resource-icon.cpu {
+                background: linear-gradient(135deg, #667eea, #764ba2);
+            }
+            .resource-icon.memory {
+                background: linear-gradient(135deg, #f093fb, #f5576c);
+            }
+            .resource-icon.storage {
+                background: linear-gradient(135deg, #4facfe, #00f2fe);
+            }
+            .resource-icon.shared {
+                background: linear-gradient(135deg, #43e97b, #38f9d7);
+            }
+
+            .resource-name {
+                font-weight: 600;
+                font-size: 1.1rem;
+                color: #333;
+            }
+
+            .price-input-group {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .price-input {
+                flex: 1;
+                padding: 10px 12px;
+                border: 2px solid #e1e5e9;
+                border-radius: 8px;
+                font-size: 16px;
+                transition: border-color 0.3s;
+            }
+
+            .price-input:focus {
+                outline: none;
+                border-color: #667eea;
+            }
+
+            .unit-label {
+                color: #666;
+                font-size: 0.9rem;
+                white-space: nowrap;
+            }
+
+            .current-price {
+                margin-top: 8px;
+                font-size: 0.9rem;
+                color: #666;
+            }
+
+            .actions {
+                display: flex;
+                gap: 15px;
+                justify-content: center;
+                margin-top: 30px;
+            }
+
+            .btn {
+                padding: 12px 30px;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s;
+            }
+
+            .btn-primary {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+            }
+
+            .btn-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            }
+
+            .btn-secondary {
+                background: #6c757d;
+                color: white;
+            }
+
+            .btn-secondary:hover {
+                background: #5a6268;
+                transform: translateY(-2px);
+            }
+
+            .alert {
+                padding: 15px 20px;
+                margin-bottom: 20px;
+                border-radius: 8px;
+                border-left: 4px solid;
+                display: none;
+            }
+
+            .alert.success {
+                background: #d4edda;
+                border-color: #28a745;
+                color: #155724;
+            }
+
+            .alert.error {
+                background: #f8d7da;
+                border-color: #dc3545;
+                color: #721c24;
+            }
+
+            .alert.warning {
+                background: #fff3cd;
+                border-color: #ffc107;
+                color: #856404;
+            }
+
+            .loading {
+                text-align: center;
+                padding: 20px;
+                color: #666;
+            }
+
+            .loading::after {
+                content: "";
+                display: inline-block;
+                width: 20px;
+                height: 20px;
+                border: 2px solid #667eea;
+                border-top: 2px solid transparent;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin-left: 10px;
+            }
+
+            @keyframes spin {
+                0% {
+                    transform: rotate(0deg);
+                }
+                100% {
+                    transform: rotate(360deg);
+                }
+            }
+
+            .change-indicator {
+                margin-left: 8px;
+                font-size: 0.8rem;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-weight: 600;
+            }
+
+            .change-indicator.increased {
+                background: #f8d7da;
+                color: #dc3545;
+            }
+
+            .change-indicator.decreased {
+                background: #d4edda;
+                color: #28a745;
+            }
+
+            .change-indicator.unchanged {
+                background: #e2e3e5;
+                color: #6c757d;
+            }
+
+            .validation-error {
+                color: #dc3545;
+                font-size: 0.85rem;
+                margin-top: 4px;
+            }
+
+            .price-history {
+                margin-top: 10px;
+                font-size: 0.85rem;
+                color: #666;
+            }
+
+            @media (max-width: 768px) {
+                .container {
+                    padding: 10px;
+                }
+
+                .header h1 {
+                    font-size: 2rem;
+                }
+
+                .env-tabs {
+                    flex-direction: column;
+                }
+
+                .resource-config {
+                    grid-template-columns: 1fr;
+                }
+
+                .actions {
+                    flex-direction: column;
+                    align-items: center;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>计费配置管理</h1>
+                <p>管理不同环境的资源计费单价，配置后当日生效</p>
+            </div>
+
+            <div class="config-panel">
+                <div class="alert" id="alertMessage">
+                    <span id="alertText"></span>
+                </div>
+
+                <div class="environment-selector">
+                    <h3 style="margin-bottom: 15px; color: #333">选择环境</h3>
+                    <div class="env-tabs" id="envTabs">
+                        <!-- 环境标签将通过JavaScript动态生成 -->
+                    </div>
+                </div>
+
+                <div id="configForms">
+                    <!-- 配置表单将通过JavaScript动态生成 -->
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // 全局变量
+            let environments = [];
+            let currentEnvId = null;
+            let originalConfigs = {};
+
+            // 资源类型配置
+            const resourceTypes = {
+                CPU: { name: "CPU", icon: "🔥", class: "cpu", unit: "核/天" },
+                MEMORY: {
+                    name: "内存",
+                    icon: "💾",
+                    class: "memory",
+                    unit: "GB/天",
+                },
+                STORAGE: {
+                    name: "本地存储",
+                    icon: "💿",
+                    class: "storage",
+                    unit: "GB/天",
+                },
+                SHARED_STORAGE: {
+                    name: "共享存储",
+                    icon: "🗄️",
+                    class: "shared",
+                    unit: "GB/天",
+                },
+            };
+
+            // 初始化
+            document.addEventListener("DOMContentLoaded", function () {
+                loadEnvironments();
+            });
+
+            // 加载环境列表
+            async function loadEnvironments() {
+                try {
+                    showLoading("加载环境配置中...");
+
+                    // 模拟API调用
+                    await new Promise((resolve) => setTimeout(resolve, 800));
+
+                    environments = [
+                        {
+                            id: 1,
+                            envCode: "TEST_INTRANET",
+                            envName: "测试内网",
+                            description: "内网测试环境",
+                        },
+                        {
+                            id: 2,
+                            envCode: "TEST_DZ",
+                            envName: "测试DZ",
+                            description: "DZ测试环境",
+                        },
+                        {
+                            id: 3,
+                            envCode: "PRE_PROD",
+                            envName: "永久准生产",
+                            description: "准生产环境",
+                        },
+                        {
+                            id: 4,
+                            envCode: "PROD_COMPILE",
+                            envName: "生产编译",
+                            description: "生产编译环境",
+                        },
+                    ];
+
+                    renderEnvironmentTabs();
+
+                    // 默认选择第一个环境
+                    if (environments.length > 0) {
+                        selectEnvironment(environments[0].id);
+                    }
+
+                    hideLoading();
+                } catch (error) {
+                    showAlert("error", "加载环境配置失败：" + error.message);
+                    hideLoading();
+                }
+            }
+
+            // 渲染环境标签
+            function renderEnvironmentTabs() {
+                const envTabs = document.getElementById("envTabs");
+                envTabs.innerHTML = environments
+                    .map(
+                        (env) =>
+                            `<div class="env-tab" data-env-id="${env.id}" onclick="selectEnvironment(${env.id})">
+                    <div style="font-weight: 600;">${env.envName}</div>
+                    <div style="font-size: 0.85rem; opacity: 0.8;">${env.envCode}</div>
+                </div>`,
+                    )
+                    .join("");
+            }
+
+            // 选择环境
+            async function selectEnvironment(envId) {
+                // 更新标签状态
+                document.querySelectorAll(".env-tab").forEach((tab) => {
+                    tab.classList.remove("active");
+                });
+                document
+                    .querySelector(`[data-env-id="${envId}"]`)
+                    .classList.add("active");
+
+                currentEnvId = envId;
+
+                // 加载该环境的配置
+                await loadEnvironmentConfig(envId);
+            }
+
+            // 加载环境配置
+            async function loadEnvironmentConfig(envId) {
+                try {
+                    showLoading("加载配置数据中...");
+
+                    // 模拟API调用
+                    await new Promise((resolve) => setTimeout(resolve, 600));
+
+                    // 模拟不同环境的配置数据
+                    const mockConfigs = {
+                        1: {
+                            // 测试内网
+                            CPU: { unitPrice: 5.0, unit: "核/天" },
+                            MEMORY: { unitPrice: 2.0, unit: "GB/天" },
+                            STORAGE: { unitPrice: 1.0, unit: "GB/天" },
+                            SHARED_STORAGE: { unitPrice: 1.5, unit: "GB/天" },
+                        },
+                        2: {
+                            // 测试DZ
+                            CPU: { unitPrice: 6.0, unit: "核/天" },
+                            MEMORY: { unitPrice: 3.0, unit: "GB/天" },
+                            STORAGE: { unitPrice: 1.2, unit: "GB/天" },
+                            SHARED_STORAGE: { unitPrice: 1.8, unit: "GB/天" },
+                        },
+                        3: {
+                            // 准生产
+                            CPU: { unitPrice: 8.0, unit: "核/天" },
+                            MEMORY: { unitPrice: 4.0, unit: "GB/天" },
+                            STORAGE: { unitPrice: 1.5, unit: "GB/天" },
+                            SHARED_STORAGE: { unitPrice: 2.0, unit: "GB/天" },
+                        },
+                        4: {
+                            // 生产编译
+                            CPU: { unitPrice: 10.0, unit: "核/天" },
+                            MEMORY: { unitPrice: 5.0, unit: "GB/天" },
+                            STORAGE: { unitPrice: 2.0, unit: "GB/天" },
+                            SHARED_STORAGE: { unitPrice: 2.5, unit: "GB/天" },
+                        },
+                    };
+
+                    const configs = mockConfigs[envId] || {};
+                    originalConfigs = { ...configs };
+
+                    renderConfigForm(envId, configs);
+                    hideLoading();
+                } catch (error) {
+                    showAlert("error", "加载配置失败：" + error.message);
+                    hideLoading();
+                }
+            }
+
+            // 渲染配置表单
+            function renderConfigForm(envId, configs) {
+                const env = environments.find((e) => e.id === envId);
+                const configForms = document.getElementById("configForms");
+
+                configForms.innerHTML = `
+                <div class="config-form active">
+                    <div class="form-title">${env.envName} - 计费配置</div>
+                    <div class="resource-config">
+                        ${Object.entries(resourceTypes)
+                            .map(([type, info]) => {
+                                const config = configs[type] || {
+                                    unitPrice: 0,
+                                    unit: info.unit,
+                                };
+                                return `
+                                <div class="resource-item">
+                                    <div class="resource-header">
+                                        <div class="resource-icon ${info.class}">${info.icon}</div>
+                                        <div class="resource-name">${info.name}</div>
+                                    </div>
+                                    <div class="price-input-group">
+                                        <input type="number"
+                                               class="price-input"
+                                               id="price_${type}"
+                                               value="${config.unitPrice.toFixed(4)}"
+                                               step="0.0001"
+                                               min="0"
+                                               placeholder="请输入单价"
+                                               onchange="validatePrice('${type}')"
+                                               oninput="calculateChange('${type}')">
+                                        <span class="unit-label">${info.unit}</span>
+                                    </div>
+                                    <div class="current-price">
+                                        当前价格: ¥${config.unitPrice.toFixed(4)} / ${info.unit}
+                                        <span class="change-indicator unchanged" id="change_${type}">无变化</span>
+                                    </div>
+                                    <div class="validation-error" id="error_${type}"></div>
+                                    <div class="price-history">
+                                        历史价格: ¥${(config.unitPrice * 0.9).toFixed(4)} (昨日)
+                                    </div>
+                                </div>
+                            `;
+                            })
+                            .join("")}
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-primary" onclick="saveConfig()">
+                            保存配置 (当日生效)
+                        </button>
+                        <button class="btn btn-secondary" onclick="resetConfig()">
+                            重置
+                        </button>
+                        <button class="btn btn-secondary" onclick="previewChanges()">
+                            预览变更
+                        </button>
+                    </div>
+                </div>
+            `;
+            }
+
+            // 验证价格输入
+            function validatePrice(resourceType) {
+                const input = document.getElementById(`price_${resourceType}`);
+                const errorDiv = document.getElementById(
+                    `error_${resourceType}`,
+                );
+                const value = parseFloat(input.value);
+
+                errorDiv.textContent = "";
+                input.style.borderColor = "#e1e5e9";
+
+                if (isNaN(value) || value < 0) {
+                    errorDiv.textContent = "请输入有效的价格";
+                    input.style.borderColor = "#dc3545";
+                    return false;
+                }
+
+                if (value > 1000) {
+                    errorDiv.textContent = "价格不能超过1000";
+                    input.style.borderColor = "#dc3545";
+                    return false;
+                }
+
+                return true;
+            }
+
+            // 计算价格变化
+            function calculateChange(resourceType) {
+                const input = document.getElementById(`price_${resourceType}`);
+                const changeIndicator = document.getElementById(
+                    `change_${resourceType}`,
+                );
+                const currentValue = parseFloat(input.value);
+                const originalValue =
+                    originalConfigs[resourceType]?.unitPrice || 0;
+
+                if (isNaN(currentValue)) {
+                    changeIndicator.textContent = "无效输入";
+                    changeIndicator.className = "change-indicator unchanged";
+                    return;
+                }
+
+                const diff = currentValue - originalValue;
+                const percentChange =
+                    originalValue > 0 ? (diff / originalValue) * 100 : 0;
+
+                if (Math.abs(diff) < 0.0001) {
+                    changeIndicator.textContent = "无变化";
+                    changeIndicator.className = "change-indicator unchanged";
+                } else if (diff > 0) {
+                    changeIndicator.textContent = `+¥${diff.toFixed(4)} (+${percentChange.toFixed(1)}%)`;
+                    changeIndicator.className = "change-indicator increased";
+                } else {
+                    changeIndicator.textContent = `¥${diff.toFixed(4)} (${percentChange.toFixed(1)}%)`;
+                    changeIndicator.className = "change-indicator decreased";
+                }
+            }
+
+            // 保存配置
+            async function saveConfig() {
+                if (!currentEnvId) {
+                    showAlert("error", "请先选择环境");
+                    return;
+                }
+
+                // 验证所有价格
+                let isValid = true;
+                const updates = [];
+
+                for (const [resourceType, info] of Object.entries(
+                    resourceTypes,
+                )) {
+                    if (!validatePrice(resourceType)) {
+                        isValid = false;
+                        continue;
+                    }
+
+                    const input = document.getElementById(
+                        `price_${resourceType}`,
+                    );
+                    const unitPrice = parseFloat(input.value);
+
+                    updates.push({
+                        resourceType: resourceType,
+                        unitPrice: unitPrice,
+                        unit: info.unit,
+                    });
+                }
+
+                if (!isValid) {
+                    showAlert("error", "请修正输入错误后再保存");
+                    return;
+                }
+
+                try {
+                    showLoading("保存配置中...");
+
+                    // 模拟API调用
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+                    // 这里应该调用实际的API
+                    // await fetch(`/api/v1/billing-config/update/${currentEnvId}`, {
+                    //     method: 'POST',
+                    //     headers: { 'Content-Type': 'application/json' },
+                    //     body: JSON.stringify(updates)
+                    // });
+
+                    showAlert("success", "配置保存成功！新配置将于当日生效。");
+
+                    // 更新原始配置
+                    for (const update of updates) {
+                        originalConfigs[update.resourceType] = {
+                            unitPrice: update.unitPrice,
+                            unit: update.unit,
+                        };
+                    }
+
+                    // 重新计算变化指示器
+                    for (const resourceType of Object.keys(resourceTypes)) {
+                        calculateChange(resourceType);
+                    }
+
+                    hideLoading();
+                } catch (error) {
+                    showAlert("error", "保存失败：" + error.message);
+                    hideLoading();
+                }
+            }
+
+            // 重置配置
+            function resetConfig() {
+                if (confirm("确定要重置所有修改吗？")) {
+                    for (const [resourceType, config] of Object.entries(
+                        originalConfigs,
+                    )) {
+                        const input = document.getElementById(
+                            `price_${resourceType}`,
+                        );
+                        if (input) {
+                            input.value = config.unitPrice.toFixed(4);
+                            calculateChange(resourceType);
+                            validatePrice(resourceType);
+                        }
+                    }
+                    showAlert("warning", "配置已重置为原始值");
+                }
+            }
+
+            // 预览变更
+            function previewChanges() {
+                const changes = [];
+
+                for (const [resourceType, info] of Object.entries(
+                    resourceTypes,
+                )) {
+                    const input = document.getElementById(
+                        `price_${resourceType}`,
+                    );
+                    const currentValue = parseFloat(input.value);
+                    const originalValue =
+                        originalConfigs[resourceType]?.unitPrice || 0;
+
+                    if (
+                        !isNaN(currentValue) &&
+                        Math.abs(currentValue - originalValue) >= 0.0001
+                    ) {
+                        const diff = currentValue - originalValue;
+                        changes.push({
+                            resource: info.name,
+                            original: originalValue.toFixed(4),
+                            new: currentValue.toFixed(4),
+                            change:
+                                diff > 0
+                                    ? `+${diff.toFixed(4)}`
+                                    : diff.toFixed(4),
+                            unit: info.unit,
+                        });
+                    }
+                }
+
+                if (changes.length === 0) {
+                    showAlert("warning", "没有检测到任何变更");
+                    return;
+                }
+
+                const env = environments.find((e) => e.id === currentEnvId);
+                let previewText = `${env.envName} 配置变更预览:\n\n`;
+
+                changes.forEach((change) => {
+                    previewText += `${change.resource}: ¥${change.original} → ¥${change.new} (${change.change}) ${change.unit}\n`;
+                });
+
+                previewText += "\n配置将于当日生效，确认要保存这些变更吗？";
+
+                if (confirm(previewText)) {
+                    saveConfig();
+                }
+            }
+
+            // 显示提示信息
+            function showAlert(type, message) {
+                const alert = document.getElementById("alertMessage");
+                const alertText = document.getElementById("alertText");
+
+                alert.className = `alert ${type}`;
+                alertText.textContent = message;
+                alert.style.display = "block";
+
+                // 3秒后自动隐藏
+                setTimeout(() => {
+                    alert.style.display = "none";
+                }, 3000);
+            }
+
+            // 显示加载状态
+            function showLoading(message) {
+                const alert = document.getElementById("alertMessage");
+                const alertText = document.getElementById("alertText");
+
+                alert.className = "alert";
+                alert.style.background = "#e8f0fe";
+                alert.style.borderColor = "#667eea";
+                alert.style.color = "#1565c0";
+                alertText.innerHTML = `<span class="loading">${message}</span>`;
+                alert.style.display = "block";
+            }
+
+            // 隐藏加载状态
+            function hideLoading() {
+                const alert = document.getElementById("alertMessage");
+                alert.style.display = "none";
+            }
+        </script>
+    </body>
+</html>
