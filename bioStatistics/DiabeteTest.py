@@ -13,4 +13,8 @@ for column in columns:
 # 查看数据概况
 print(df.isnull().sum())
 print("-"*20)
-print(df.info())
+for col in columns:
+   col_mdedian =  df[col].median()
+   df[col] = df[col].fillna(col_mdedian)
+
+print(df.isnull().sum())
