@@ -1,5 +1,9 @@
+from random import sample
+
 import pandas as pd
 import numpy as np
+from scipy import stats
+from sklearn.model_selection import train_test_split,cross_val_score
 from sklearn.preprocessing import StandardScaler
 
 class DiabetesMedicalAnalysis:
@@ -10,12 +14,13 @@ class DiabetesMedicalAnalysis:
         :param data_path:
         """
         self.data_path = data_path
-        self.df = None
+        # self.df = None
         self.X_train = None
         self.y_train = None
         self.X_test = None
         self.y_test = None
         self.model = None
+        self.df = None
         #  将数据转换为标准正态分布
         self.scaler = StandardScaler()
 
@@ -73,6 +78,58 @@ class DiabetesMedicalAnalysis:
             print(f"{feature}: 填充了 {zero_count} 个零值，使用中位数 {median_value:.2f}")
         return self.df
 
+    def statistical_tests(self):
+        print("统计假设检验")
+        print("="*50)
+        results = []
+        features = self.df.columns[:-1]
+        for feature in features:
+            # 分组数据
+            group_0 = self.df[self.df['Outcome'] == 0][feature]
+            group_1 = self.df[self.df['Outcome'] == 1][feature]
+            # 正态性检验
+            stat_0, p_0 = stats.shapiro(group_0.sample(min(5000, len(group_0))))
+            stat_1, p_1 = stats.shapiro(group_1.sample(min(5000, len(group_1))))
+            # 根据正态选择检验方法
+            if p_0 > 0.05 and p_1 > 0.05:
+                # t检验
+                t_stat,p_value = stats.ttest_ind(group_0,group_1)
+                test_type = 't-test'
+            else :
+                u_stat,p_value = stats.mannwhitneyu(group_0,group_1)
+                test_type = 'Mann-Whitney U'
+            # 计算效应量
+            """
+            想象你在开发一种降血压药（或者试剂盒），你有两组数据：吃药组 vs. 不吃药组。
+            P 值 (P-value)：回答 “有没有区别？”
+            它像一个开关（Boolean）。
+            P < 0.05：有区别！
+            但是：如果你的样本量超级大（比如 10 万人），哪怕血压只降了 0.01 mmHg，P 值也会小于 0.05。
+            结论：统计学上显著，但在医学上毫无意义（降 0.01 等于没降）。
+            效应量 (Effect Size/Cohen's d)：回答 “区别有多大？”
+            它是一个程度值（Float）。
+            它不看样本量，只看两组数据的真实差距。
+            结论：如果效应量很小（比如 0.01），说明虽然 P 值显著，但这个药其实是个“废柴”。
+            """
+            conhens_d = ((group_1.mean()-group_0.mean())/
+                         np.sqrt((group_1.std() ** 2 + group_0.std() ** 2))/2)
+            results.append({
+                'Feature': feature,
+                'Test': test_type,
+                'Mean(Healthy)': group_0.mean(),
+                'Mean(Diabetic)': group_1.mean(),
+                'Statistic': t_stat if test_type == 't-test' else u_stat,
+                'P_value': p_value,
+                "Conhen's d": conhens_d,
+                'Significant': '***' if p_value < 0.001 else '**' if p_value < 0.01 else '*' if p_value < 0.05 else 'ns'
+            })
+        results_df = pd.DataFrame(results)
+        print("\n统计检验结果：")
+        print(results_df.to_string(index=False))
+        # 保存结果
+        results_df.to_csv('resources/statistical_teset_results.csv',index=False)
+        print("\n统计检验结果已保存：statistical_teset_results.csv")
+        return results_df
 
 
 
@@ -81,4 +138,6 @@ if __name__=="__main__":
     dma.loadData()
     dma.data_quality_check()
     dma.clean_data()
+    dma.statistical_tests()
+    dma.statistical_tests()
 
