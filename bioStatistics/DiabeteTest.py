@@ -131,13 +131,60 @@ class DiabetesMedicalAnalysis:
         print("\n统计检验结果已保存：statistical_teset_results.csv")
         return results_df
 
-
+    def calculate_reference_interval(self,originalData_df,confidence=0.95):
+        """
+            计算参考区间
+            data: 必须是【健康人】的数据列表
+            confidence: 默认95%双侧区间
+        :param data:
+        :param confidence:
+        :return:
+        """
+        data = originalData_df[originalData_df['Outcome'] == 0]['Glucose']
+        data = data[data > 0]
+        n = len(data)
+        if n < 120:
+            print(f"警告：样本量n={n} 不足120，计算的参考区间可能不稳定(CLSI C28-A3 标准推荐 n>=120)）")
+        # 1， 正态性检验
+        stat,p_value = stats.shapiro(data)
+        print(f"---参考区间计算（N={n}）---")
+        print(f"正态性检验 P值：{p_value:.4f}")
+        lower_limit,upper_limit = 0,0
+        if p_value > 0.05:
+            # A 正态分布 参数法
+            method = "参数法（Mean +- 1.96SD）"
+            mean_val = np.mean(data)
+            # ddof = 1 样本标准差
+            std_val = np.std(data,ddof=1)
+            # 计算双侧界限
+            z_score = stats.norm.ppf((1+ confidence)/2) # 通常是1.96
+            print(f"z_score={z_score:.4f}")
+            lower_limit = mean_val - std_val * z_score
+            upper_limit = mean_val + std_val * z_score
+        else:
+            # B. 偏态分布 （非参数法/百分位数法）
+            method = "非参数法（2.5% - 97.5% 分位数）"
+            # 计算分位点
+            q_low = (1-confidence)/2
+            q_high = 1 - (1-confidence)/2
+            lower_limit = np.percentile(data,q_low * 100)
+            upper_limit = np.percentile(data,q_high * 100)
+            print(f"2.5% 分位数：{lower_limit:.2f}")
+            print(f"97.5% 分位数：{upper_limit:.2f}")
+        print(f"采用方法：{method}")
+        print(f"计算结果：[{lower_limit:.2f},{upper_limit:.2f}]")
+        print("-"*30)
+        print(f"最终结论：该试剂盒的血糖正常参考范围是 {lower_limit:.1f} - {upper_limit:.1f}")
+        return lower_limit,upper_limit
 
 if __name__=="__main__":
-    dma = DiabetesMedicalAnalysis("resources/diabetes.csv")
+    data_path = 'resources/diabetes.csv'
+    dma = DiabetesMedicalAnalysis(data_path)
     dma.loadData()
     dma.data_quality_check()
     dma.clean_data()
     dma.statistical_tests()
-    dma.statistical_tests()
+    # ⭐ 关键修改：重新读取原始数据，而不是使用 self.df
+    original_df = pd.read_csv(data_path)
+    dma.calculate_reference_interval(original_df)
 
