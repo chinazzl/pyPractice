@@ -132,6 +132,28 @@ class DiabetesMedicalAnalysis:
         print("\n统计检验结果已保存：statistical_test_results.csv")
         return results_df
 
+    """
+    在计算参考区间之前（CLSI C28-A3 标准建议），我们必须剔除离群值。
+    
+    比如：虽然你选的是“健康人”，但有个人可能那天喝醉了，血糖飙到 300。
+    
+    如果不剔除这个 300，你算出来的上限就会被拉高，导致试剂盒“不灵敏”。
+    """
+    def remove_outliers_iqr(self,data):
+        """
+            辅助函数 使用IQR（四分位距法）提出离群值
+        :return:
+        """
+        Q1 = np.percentile(data,25)
+        Q3 = np.percentile(data,75)
+        IQR = Q3 - Q1
+        # 定义篱笆
+        lower_fence = Q1 - 1.5*IQR
+        upper_fence = Q3 + 1.5*IQR
+        # 只保留篱笆内的数据
+        clean_data = [x for x in data  if lower_fence <= x <= upper_fence]
+        return clean_data
+
     def calculate_reference_interval(self,originalData_df,confidence=0.95):
         """
             计算参考区间
@@ -143,6 +165,9 @@ class DiabetesMedicalAnalysis:
         """
         data = originalData_df[originalData_df['Outcome'] == 0]['Glucose']
         data = data[data > 0]
+        # 使用IQR进行过滤
+        clean_data_list = self.remove_outliers_iqr(data)
+        data = pd.Series(clean_data_list)
         n = len(data)
         if n < 120:
             print(f"警告：样本量n={n} 不足120，计算的参考区间可能不稳定(CLSI C28-A3 标准推荐 n>=120)）")
@@ -204,6 +229,7 @@ class DiabetesMedicalAnalysis:
         plt.legend()
         plt.show()
         return lower_limit,upper_limit
+
 
 if __name__=="__main__":
     data_path = 'resources/diabetes.csv'
