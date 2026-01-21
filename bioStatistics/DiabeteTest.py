@@ -5,6 +5,7 @@ import numpy as np
 from scipy import stats
 from sklearn.model_selection import train_test_split,cross_val_score
 from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
 
 class DiabetesMedicalAnalysis:
 
@@ -127,8 +128,8 @@ class DiabetesMedicalAnalysis:
         print("\n统计检验结果：")
         print(results_df.to_string(index=False))
         # 保存结果
-        results_df.to_csv('resources/statistical_teset_results.csv',index=False)
-        print("\n统计检验结果已保存：statistical_teset_results.csv")
+        results_df.to_csv('resources/statistical_test_results.csv',index=False)
+        print("\n统计检验结果已保存：statistical_test_results.csv")
         return results_df
 
     def calculate_reference_interval(self,originalData_df,confidence=0.95):
@@ -146,7 +147,7 @@ class DiabetesMedicalAnalysis:
         if n < 120:
             print(f"警告：样本量n={n} 不足120，计算的参考区间可能不稳定(CLSI C28-A3 标准推荐 n>=120)）")
         # 1， 正态性检验
-        stat,p_value = stats.shapiro(data)
+        stat,p_value = stats.shapiro(data.sample(min(5000,len(data))))
         print(f"---参考区间计算（N={n}）---")
         print(f"正态性检验 P值：{p_value:.4f}")
         lower_limit,upper_limit = 0,0
@@ -175,6 +176,33 @@ class DiabetesMedicalAnalysis:
         print(f"计算结果：[{lower_limit:.2f},{upper_limit:.2f}]")
         print("-"*30)
         print(f"最终结论：该试剂盒的血糖正常参考范围是 {lower_limit:.1f} - {upper_limit:.1f}")
+        # Q-Q图
+        """
+            关键观察：
+            左尾（低值区）：点在红线下方，说明实际数据比正态分布更"聚集"
+            右尾（高值区）：点在红线上方，说明存在比正态分布预期更多的高值
+            这是典型的 "重尾"（Heavy-tailed）分布，也就是说：
+            
+            数据的尾部比标准正态分布更"厚"
+            极端值（特别是高值）比正态分布预期的要多
+            这会导致 正峰度（尖峰厚尾）
+            为什么会这样？
+            在健康人群的血糖数据中，可能的原因：
+            混入了亚临床高血糖者：虽然标记为健康（Outcome=0），但可能有些人处于糖尿病前期
+            测量误差：极端高值可能是检测异常
+            生理特征：血糖本身就不是完美正态的，特别是在包含餐后血糖的情况下
+        """
+        stats.probplot(data, dist="norm", plot=plt)
+        plt.title("Q-Q Plot for Glucose (Healthy)")
+        plt.show()
+        # 直方图 + 正态分布
+        plt.hist(data, bins=30, density=True, alpha=0.7)
+        # 叠加正态分布曲线
+        mu, sigma = data.mean(), data.std()
+        x = np.linspace(data.min(), data.max(), 100)
+        plt.plot(x, stats.norm.pdf(x, mu, sigma), 'r-', label='Normal')
+        plt.legend()
+        plt.show()
         return lower_limit,upper_limit
 
 if __name__=="__main__":
