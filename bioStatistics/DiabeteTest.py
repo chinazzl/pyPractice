@@ -6,6 +6,7 @@ from scipy import stats
 from sklearn.model_selection import train_test_split,cross_val_score
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 class DiabetesMedicalAnalysis:
 
@@ -111,6 +112,40 @@ class DiabetesMedicalAnalysis:
             它是一个程度值（Float）。
             它不看样本量，只看两组数据的真实差距。
             结论：如果效应量很小（比如 0.01），说明虽然 P 值显著，但这个药其实是个“废柴”。
+            
+            # 场景对比：
+            场景A: 小样本研究
+            - 健康人组（n=20）：血糖平均值 100 mg/dL
+            - 糖尿病组（n=20）：血糖平均值 120 mg/dL
+            - 差值：20 mg/dL
+            - P值：0.08（不显著）
+            
+            场景B: 大样本研究
+            - 健康人组（n=10000）：血糖平均值 100 mg/dL
+            - 糖尿病组（n=10000）：血糖平均值 102 mg/dL
+            - 差值：2 mg/dL
+            - P值：<0.001（高度显著）
+            
+            # 问题：
+            # 场景A：差值20 mg/dL，但P值不显著 → 结论"没区别"？
+            # 场景B：差值2 mg/dL，但P值显著 → 结论"有区别"？
+            
+            # 答案：
+            # P值只告诉你"是否统计显著"，不告诉你"临床意义多大"
+            # Cohen's d 告诉你"实际差异有多大
+            
+            # 记忆口诀：
+            # 0.2 - 稍微有点区别
+            # 0.5 - 有明显区别
+            # 0.8 - 区别很大
+            # 1.0 - 区别非常大
+            关键理解：
+
+            •	P值 < 0.05 ≠ 临床有意义
+            •	Cohen’s d >= 0.5 ≠ 统计显著
+            •	理想情况：P < 0.05 且 d >= 0.5（既有统计意义又有临床意义）
+            •	最糟情况：P < 0.05 但 d < 0.2（统计显著但临床无意义）
+            
             """
             conhens_d = ((group_1.mean()-group_0.mean())/
                          np.sqrt((group_1.std() ** 2 + group_0.std() ** 2))/2)
@@ -228,17 +263,168 @@ class DiabetesMedicalAnalysis:
         plt.plot(x, stats.norm.pdf(x, mu, sigma), 'r-', label='Normal')
         plt.legend()
         plt.show()
+        self.plot_refernce_distribution(data,lower_limit,upper_limit,"Glucose")
         return lower_limit,upper_limit
 
+    def plot_refernce_distribution(self,data,low,high,feature_name):
+        """
+            画图函数：绘制直方图并标记参考区间界限
+        :return:
+        """
+        plt.figure(figsize=(10,6))
+        # 1. 绘制直方图和密度曲线
+        sns.histplot(data,kde=True,color='blue',label="Healthy Distribution")
+        #2. 画出参考下限和上限
+        plt.axvline(low,color='red',linestyle='--',linewidth=2,label=f"Low Limit ({low:.2f})")
+        plt.axvline(high,color='red',linestyle='--',linewidth=2,label=f"High Limit ({high:.2f})")
+        # 3.添加图例和标题
+        plt.title(f'Reference Interval Distribution: {feature_name}', fontsize=14)
+        plt.xlabel(feature_name)
+        plt.ylabel('Count / Frequency')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.show()
+
+    def generate_report(self,result_df= None):
+        """步骤7: 生成分析报告"""
+        print("\n" + "=" * 60)
+        print("步骤7: 生成分析报告")
+        print("=" * 60)
+        if result_df is None:
+            try:
+                result_df = pd.read_csv('resources/statistical_test_results.csv')
+            except FileNotFoundError:
+                print("警告：未找到统计检验结果文件，使用默认模板")
+                result_df = None
+        if result_df is not None:
+            # 筛选显著特征
+            significant_features = result_df[result_df['P_value'] < 0.05].copy()
+            significant_features = significant_features.sort_values('P_value')
+            # 按效应量分类
+            high_effect = significant_features[abs(significant_features["Conhen's d"]) >= 0.8]
+            medium_effect = significant_features[
+                (abs(significant_features["Conhen's d"]) >= 0.5) &
+                (abs(significant_features["Conhen's d"]) < 0.8)
+            ]
+            small_effect = significant_features[
+                (abs(significant_features["Conhen's d"]) >= 0.2) &
+                (abs(significant_features["Conhen's d"]) < 0.5)
+            ]
+            # 生成风险因素描述
+            risk_factors = []
+            for idx,row in high_effect.iterrows():
+                feature = row['Feature']
+                cohens_d = row['Cohens d']
+                mean_healthy= row['Mean(Healthy)']
+                mean_diabetic = row['Mean(Diabetic)']
+                direction = "高于" if mean_diabetic > mean_healthy else "低于 "
+                risk_factors.append(
+                    f" -{feature}({'效应量：' + f'{cohens_d:.2f}'}：糖尿病患者{direction}健康人，"
+                    f"p<0.001,大效应)"
+                )
+            for idx,row in medium_effect.iterrows():
+                feature = row['Feature']
+                cohens_d = row["Conhen's d"]
+                mean_healthy = row['Mean(Healthy)']
+                mean_diabetic = row['Mean(Diabetic)']
+                direction = "高于" if mean_diabetic > mean_healthy else "低于"
+                risk_factors.append(
+                    f"   - {feature}（效应量：{cohens_d:.2f}，中等效应）"
+                )
+            risk_factors_text = "\n".join(risk_factors) if risk_factors else "   （无显著风险因素）"
+        else:
+            risk_factors_text = "   （数据未加载）"
+
+        report = f"""
+            ================================================================================
+                                糖尿病数据医学统计分析报告
+            ================================================================================
+            
+            一、数据概况
+            --------------------------------------------------------------------------------
+            数据集大小: {self.df.shape[0]} 个样本
+            特征数量: {self.df.shape[1] - 1} 个医学指标
+            目标变量: Outcome (0=非糖尿病, 1=糖尿病)
+            
+            二、主要发现
+            --------------------------------------------------------------------------------
+            1. 数据质量
+               - 总体数据完整性良好
+               - 部分生理指标存在零值，可能是缺失值或测量误差
+            
+            2. 关键风险因素（基于统计检验）
+               {risk_factors_text}
+            
+            3. 非显著因素
+            3. 非显著因素
+                - 以下因素在两组间差异无统计学意义（P >= 0.05）：
+                {chr(10).join([f'     - {row["Feature"]}' for idx, row in result_df[result_df['P_value'] >= 0.05].iterrows()]) if result_df is not None else '     （数据未加载）'}
+                
+            4. 预测模型性能
+               - 模型类型: 逻辑回归
+               - 测试集准确率: 待评估
+               - AUC: 待评估
+               - 交叉验证平均准确率: 待评估
+            
+            
+            三、临床建议
+            --------------------------------------------------------------------------------
+           1. 诊断指标优先级
+            {chr(10).join([f'   - {row["Feature"]}：应作为主要诊断依据（大效应量）' for idx, row in high_effect.iterrows()]) if result_df is not None and not high_effect.empty else '   - 建议结合多项指标进行综合评估'}
+
+            2. 风险因素管理
+            {chr(10).join([f'   - 关注{row["Feature"]}的干预（中等效应量）' for idx, row in medium_effect.iterrows()]) if result_df is not None and not medium_effect.empty else '   - 建议结合多项指标进行综合评估'}
+            
+            3. 弱相关因素
+               - 以下因素对糖尿病预测贡献有限（小效应量或无显著性）：
+                {chr(10).join([f'     - {row["Feature"]}' for idx, row in result_df[(result_df['P_value'] >= 0.05) | (abs(result_df["Conhen's d"]) < 0.2)].iterrows()]) if result_df is not None else '     （需进一步分析）'}
+            
+            四、方法学说明
+            --------------------------------------------------------------------------------
+            - 统计检验: t检验/Mann-Whitney U检验
+            - 参考区间计算: 参数法/非参数法（根据正态性检验选择）
+            - 显著性水平: α = 0.05
+            - 效应量评估: Cohen's d（0.2小/0.5中/0.8大）
+            
+            五、局限性
+            --------------------------------------------------------------------------------
+            1. 样本量有限（{self.df.shape[0]}例），可能影响统计效能
+            2. 横断面研究设计，无法确定因果关系
+            3. 部分指标存在缺失值，已用中位数填充
+            4. 需要在独立人群中验证参考区间
+            
+            ================================================================================
+            报告生成时间: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}
+            ================================================================================
+        """
+
+        print(report)
+
+        # 保存报告
+        with open('resources/diabetes_analysis_report.txt', 'w', encoding='utf-8') as f:
+            f.write(report)
+
+        print("\n完整报告已保存: diabetes_analysis_report.txt")
+
+        return report
+
+def main():
+    try:
+        data_path = 'resources/diabetes.csv'
+        dma = DiabetesMedicalAnalysis(data_path)
+        dma.loadData()
+        dma.data_quality_check()
+        dma.clean_data()
+        dma.statistical_tests()
+        # ⭐ 关键修改：重新读取原始数据，而不是使用 self.df
+        original_df = pd.read_csv(data_path)
+        dma.calculate_reference_interval(original_df)
+        dma.generate_report()
+    except Exception as e:
+        print(f"\n分析过程出现异常：{str(e)}")
+        import traceback
+        traceback.print_exc()
 
 if __name__=="__main__":
-    data_path = 'resources/diabetes.csv'
-    dma = DiabetesMedicalAnalysis(data_path)
-    dma.loadData()
-    dma.data_quality_check()
-    dma.clean_data()
-    dma.statistical_tests()
-    # ⭐ 关键修改：重新读取原始数据，而不是使用 self.df
-    original_df = pd.read_csv(data_path)
-    dma.calculate_reference_interval(original_df)
+    main()
 
