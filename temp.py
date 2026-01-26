@@ -1,17 +1,14 @@
 # -*- coding: utf-8 -*-
+import re
 
-def foreach():
-    for i in range(5):
-        print(i)
 
-def inceament(num,step,another=1):
-    """
-    增加数字
-    :param num: 数字
-    :param step: 步长
-    :param another: 另一个参数
-    :return: 增加后的数字
-    """
-    return num + step + another
+def getnum(val):
+    matches = re.findall(r"[-+]?\d*\.\d+|\d+]", val)
+    if matches:
+        return float(matches[0])
+    return None
 
-print(inceament(1,2))
+
+if __name__ == "__main__":
+    f = getnum("> -0.24")
+    print(f)
