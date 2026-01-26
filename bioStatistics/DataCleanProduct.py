@@ -28,7 +28,12 @@ class CleanData:
         print("="*50)
         print("步骤一、数据加载")
         self.df = pd.read_csv(self.data_path)
-        print(f"\n数据集大小：{self.df.shape}")
+        # 指定这些咧可能是混合类型
+        mix_type_cols =  ['Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI']
+        for col in mix_type_cols:
+            self.df[col] = self.df[col].astype(object)
+
+        print(f"\n 处数据集大小：{self.df.shape}")
         print(f"\n样本数量{self.df.shape[0]}")
         print(f"\n特征数量{self.df.shape[1]}")
         print(f"\n数据类型:")
