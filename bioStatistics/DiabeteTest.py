@@ -1,12 +1,11 @@
-from random import sample
-
-import pandas as pd
-import numpy as np
-from scipy import stats
-from sklearn.model_selection import train_test_split,cross_val_score
-from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
+from scipy import stats
+from sklearn.metrics import auc, confusion_matrix, roc_curve
+from sklearn.preprocessing import StandardScaler
+
 
 class DiabetesMedicalAnalysis:
 
@@ -408,6 +407,99 @@ class DiabetesMedicalAnalysis:
 
         return report
 
+    def method_comparison(self):
+        """
+            如何证明你的新机器和金标准是一致的
+            实现回归分析：算斜率、截距、R2
+            实现Bland-Altman分析：算偏差Bias和一致性界限LoA
+        """
+        print("方法学比对")
+        print("\n" + "=="*50)
+        # 假设Glucose是新机器测的，我们造一个金标准 Glucose_Gold
+        # 金标准 = 新机器 /1.05（有5%的偏差） + 随机噪音
+        np.random.seed(42)
+        y_new = self.df['Glucose']
+        x_gold = y_new / 1.05 + np.random.normal(0,2,len(y_new))
+        # 2. 线性回归分析
+        slope,intercept, r_value,p_value,std_err = stats.linregress(x_gold, y_new)
+        print(f"回归方程：Y= {slope:.3f}X + {intercept:.3f}")
+        print(f"相关系数(R^2): {r_value ** 2:.4f}")
+        # 3. Bland -ALtman分析
+        diff = y_new - x_gold
+        mean_diff = np.mean(diff)
+        sd_diff = np.std(diff)
+        # 上界限
+        upper_loa = mean_diff + 1.96 * sd_diff
+        # 下界限
+        lower_loa = mean_diff - 1.96 * sd_diff
+        print(f"平均偏差（Bias）：{mean_diff:.2f}")
+        print(f"95%一致性界限(LoA):[{lower_loa:.2f},{upper_loa:.2f}]")
+
+        # 4. 绘图（回归图 + BA图）
+        plt.subplot(1,2,1)
+        plt.plot(x_gold, slope * x_gold + intercept,color='red',linewidth=2,label = f'R^2={r_value**2:.4f}')
+        plt.title('Regressioin Analysis')
+        plt.xlabel('Gold Standard')
+        plt.ylabel('New Method')
+        plt.legend()
+
+        # BA图
+        plt.subplot(1,2,2)
+        plt.scatter((x_gold + y_new)/2,diff,alpha=0.3)
+        plt.axhline(mean_diff,color='red',linestyle='-',label='Bias')
+        plt.axhline(upper_loa,color='red',linestyle='--',label='Upper LoA')
+        plt.axhline(lower_loa,color='red',linestyle='--',label='Lower LoA')
+        plt.title('Bland-Altman Analysis')
+        plt.xlabel('Mean of Methods')
+        plt.ylabel('Difference (New - Gold)')
+        plt.legend()
+        plt.show()
+
+    def evaluate_diagnostic_performance(self, feature='Glucose', threshold=None):
+        """
+        任务二：诊断效能评估
+        计算 ROC, AUC, 灵敏度, 特异度
+        """
+        print("\n" + "=" * 50)
+        print(f"步骤：诊断效能评估 ({feature})")
+        print("=" * 50)
+
+        y_true = self.df['Outcome']
+        y_scores = self.df[feature]
+
+        # 1. 计算 ROC 和 AUC
+        fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+        roc_auc = auc(fpr, tpr)
+        print(f"AUC 值: {roc_auc:.4f}")
+
+        # 2. 确定 Cut-off 值
+        # 如果没传阈值，就用 Youden 指数最大点 (TPR - FPR 最大)
+        if threshold is None:
+            youden_index = tpr - fpr
+            best_idx = np.argmax(youden_index)
+            threshold = thresholds[best_idx]
+            print(f"自动计算最佳 Cut-off 值: {threshold:.2f}")
+
+        # 3. 计算灵敏度和特异度
+        y_pred = (y_scores >= threshold).astype(int)
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+
+        sensitivity = tp / (tp + fn)
+        specificity = tn / (tn + fp)
+
+        print(f"灵敏度 (Sensitivity): {sensitivity:.2%}")
+        print(f"特异度 (Specificity): {specificity:.2%}")
+
+        # 4. 绘制 ROC 曲线
+        plt.figure()
+        plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
+        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title(f'ROC Curve: {feature}')
+        plt.legend(loc="lower right")
+        plt.show()
+
 def main():
     try:
         data_path = 'resources/diabetes.csv'
@@ -419,6 +511,13 @@ def main():
         # ⭐ 关键修改：重新读取原始数据，而不是使用 self.df
         original_df = pd.read_csv(data_path)
         dma.calculate_reference_interval(original_df)
+        # 5. 【新增】方法学比对 (证明机器准) -> 对应任务一
+        # 注意：这是模拟数据，演示你的回归分析能力
+        dma.method_comparison()
+
+        # 6. 【新增】诊断效能评估 (证明能看病) -> 对应任务二
+        # 计算 Glucose 的 ROC 和 AUC
+        dma.evaluate_diagnostic_performance(feature='Glucose')
         dma.generate_report()
     except Exception as e:
         print(f"\n分析过程出现异常：{str(e)}")
