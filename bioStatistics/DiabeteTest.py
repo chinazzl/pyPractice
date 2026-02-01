@@ -500,6 +500,13 @@ class DiabetesMedicalAnalysis:
         plt.legend(loc="lower right")
         plt.show()
 
+"""
+在 IVD 数据分析中，工具的出场顺序是有严格逻辑的：
+第一关（T检验 / Mann-Whitney）：输入：连续数值（血糖）。问：病人和健康人平均值一样吗？答：P < 0.05，不一样。 $\rightarrow$ 通过，进入下一关。
+第二关（ROC / AUC）：输入：连续数值（血糖）。问：这个指标能把两类人分得多开？答：AUC = 0.85，分得挺开。 $\rightarrow$ 通过，找最佳阈值。
+第三关（混淆矩阵 / 卡方 / Kappa）：输入：定性类别（阴/阳，基于阈值切割后）。问：在当前阈值下，误诊率和漏诊率是多少？
+    答：灵敏度 80%，特异度 90%。 $\rightarrow$ 写入说明书。
+"""
 def main():
     try:
         data_path = 'resources/diabetes.csv'
