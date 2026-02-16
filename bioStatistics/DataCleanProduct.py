@@ -8,6 +8,8 @@
 import pandas as pd
 import numpy as np
 import re
+
+from sklearn.impute import KNNImputer
 from sklearn.preprocessing import StandardScaler
 
 
@@ -130,6 +132,53 @@ class CleanData:
                 median_val = self.df[col].median()
                 self.df[col] = self.df[col].replace(np.nan, median_val)
             print(f"\n【清洗报告】填补模式，所有的NaN已经用中位数进行填补")
+        elif strategy == 'advanced':
+            print("【智能模式】开始分层处理缺失值")
+            cols_to_drop = []
+            cols_to_knn = []
+            cols_to_median = []
+            for col in features:
+                # 计算缺失率
+                missing_pct = self.df[col].isnull().mean() * 100
+                if missing_pct == 0:
+                    continue
+                print(f" > 指标{col}缺失率：{missing_pct:.2f}%,", end="->")
+                if missing_pct > 30:
+                    #策略 >30% :剔除该指标
+                    print("剔除该指标（Drop Column）")
+                    cols_to_drop.append(col)
+                # 5~30使用KNN填补
+                elif 5 < missing_pct < 30:
+                    print("使用KNN填补")
+                    cols_to_knn.append(col)
+                # <5 中位数填补
+                print("中位数填补")
+                cols_to_median.append(col)
+            # 执行批处理操作
+            if cols_to_drop:
+                self.df.drop(cols_to_drop, inplace=True)
+                # 更新特征列表，防止后续报错
+                features = [f for f in features if f not in cols_to_drop]
+            # B 中位数填补 <5%
+            for col in cols_to_median:
+                median_val = self.df[col].median()
+                self.df[col] = self.df[col].replace(np.nan, median_val)
+            # C. KNN填补
+            if cols_to_knn:
+                # KNN 需要利用所有数值型特征来计算距离
+                # 注意：这里我们只对需要填补的列进行 KNN，但在 fit 时最好使用所有可用特征辅助推断
+                # 为了简单起见，我们对当前剩余的所有 features 进行 KNN Imputation
+                imputer = KNNImputer(n_neighbors=5)
+
+                # KNNImputer 返回的是 numpy array，需要转回 DataFrame
+                # 这里只针对 features 里的列进行处理，保持其他列（如 Outcome）不变
+                df_features = self.df[features]
+                imputed_data = imputer.fit_transform(df_features)
+
+                # 将填补后的数据更新回 self.df
+                df_imputed = pd.DataFrame(imputed_data, columns=features, index=self.df.index)
+                self.df.update(df_imputed)  # update 方法会根据索引匹配更新值
+
         print(f"清洗后剩余样本量：{len(self.df)}")
         print("="*50)
         return self.df
