@@ -93,24 +93,33 @@ class DiabetesMedicalAnalysis:
             stat_1, p_1 = stats.shapiro(group_1.sample(min(5000, len(group_1))))
             # 根据正态选择检验方法
             if p_0 > 0.05 and p_1 > 0.05:
-                # t检验
-                t_stat,p_value = stats.ttest_ind(group_0,group_1)
-                test_type = 't-test'
+                # 满足正态分布，追加：方差齐性检验 (Levene's test)
+                stat_levene, p_levene = stats.levene(group_0, group_1)
+
+                if p_levene > 0.05:
+                    # 1. 方差齐性：使用标准独立样本t检验
+                    t_stat, p_value = stats.ttest_ind(group_0, group_1, equal_var=True)
+                    test_type = 't-test (Student)'
+                else:
+                    # 2. 方差不齐：使用 Welch's t检验（equal_var=False）
+                    t_stat, p_value = stats.ttest_ind(group_0, group_1, equal_var=False)
+                    test_type = "t-test (Welch's)"
             else :
+                # 3. 不满足正态分布：使用非参数检验
                 u_stat,p_value = stats.mannwhitneyu(group_0,group_1)
                 test_type = 'Mann-Whitney U'
             # 计算效应量
             """
             想象你在开发一种降血压药（或者试剂盒），你有两组数据：吃药组 vs. 不吃药组。
-            P 值 (P-value)：回答 “有没有区别？”
+            P 值 (P-value)：回答 "有没有区别？"
             它像一个开关（Boolean）。
             P < 0.05：有区别！
             但是：如果你的样本量超级大（比如 10 万人），哪怕血压只降了 0.01 mmHg，P 值也会小于 0.05。
             结论：统计学上显著，但在医学上毫无意义（降 0.01 等于没降）。
-            效应量 (Effect Size/Cohen's d)：回答 “区别有多大？”
+            效应量 (Effect Size/Cohen's d)：回答 "区别有多大？"
             它是一个程度值（Float）。
             它不看样本量，只看两组数据的真实差距。
-            结论：如果效应量很小（比如 0.01），说明虽然 P 值显著，但这个药其实是个“废柴”。
+            结论：如果效应量很小（比如 0.01），说明虽然 P 值显著，但这个药其实是个"废柴"。
             
             # 场景对比：
             场景A: 小样本研究
@@ -147,13 +156,13 @@ class DiabetesMedicalAnalysis:
             
             """
             conhens_d = ((group_1.mean()-group_0.mean())/
-                         np.sqrt((group_1.std() ** 2 + group_0.std() ** 2))/2)
+                         np.sqrt((group_1.std() ** 2 + group_0.std() ** 2) / 2))
             results.append({
                 'Feature': feature,
                 'Test': test_type,
                 'Mean(Healthy)': group_0.mean(),
                 'Mean(Diabetic)': group_1.mean(),
-                'Statistic': t_stat if test_type == 't-test' else u_stat,
+                'Statistic': t_stat if 't-test' in test_type else u_stat,
                 'P_value': p_value,
                 "Conhen's d": conhens_d,
                 'Significant': '***' if p_value < 0.001 else '**' if p_value < 0.01 else '*' if p_value < 0.05 else 'ns'
@@ -169,9 +178,9 @@ class DiabetesMedicalAnalysis:
     """
     在计算参考区间之前（CLSI C28-A3 标准建议），我们必须剔除离群值。
     
-    比如：虽然你选的是“健康人”，但有个人可能那天喝醉了，血糖飙到 300。
+    比如：虽然你选的是"健康人"，但有个人可能那天喝醉了，血糖飙到 300。
     
-    如果不剔除这个 300，你算出来的上限就会被拉高，导致试剂盒“不灵敏”。
+    如果不剔除这个 300，你算出来的上限就会被拉高，导致试剂盒"不灵敏"。
     """
     def remove_outliers_iqr(self,data):
         """
@@ -313,7 +322,7 @@ class DiabetesMedicalAnalysis:
             risk_factors = []
             for idx,row in high_effect.iterrows():
                 feature = row['Feature']
-                cohens_d = row['Cohens d']
+                cohens_d = row["Conhen's d"]
                 mean_healthy= row['Mean(Healthy)']
                 mean_diabetic = row['Mean(Diabetic)']
                 direction = "高于" if mean_diabetic > mean_healthy else "低于 "
@@ -333,11 +342,11 @@ class DiabetesMedicalAnalysis:
             risk_factors_text = "\n".join(risk_factors) if risk_factors else "   （无显著风险因素）"
         else:
             risk_factors_text = "   （数据未加载）"
+            high_effect = pd.DataFrame()
+            medium_effect = pd.DataFrame()
 
         report = f"""
-            ================================================================================
                                 糖尿病数据医学统计分析报告
-            ================================================================================
             
             一、数据概况
             --------------------------------------------------------------------------------
@@ -392,9 +401,7 @@ class DiabetesMedicalAnalysis:
             3. 部分指标存在缺失值，已用中位数填充
             4. 需要在独立人群中验证参考区间
             
-            ================================================================================
             报告生成时间: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}
-            ================================================================================
         """
 
         print(report)
@@ -533,4 +540,3 @@ def main():
 
 if __name__=="__main__":
     main()
-
